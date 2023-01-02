@@ -21,6 +21,9 @@
     <ClCompile Include="Core.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Utility\TextureStore.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Core.h">
@@ -288,6 +291,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="dependencies\include\SDL2_ttf\SDL_ttf.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Utility\TextureStore.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -153,6 +153,7 @@
   <ItemGroup>
     <ClCompile Include="Core.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Utility\TextureStore.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Core.h" />
@@ -244,6 +245,7 @@
     <ClInclude Include="dependencies\include\SDL2\SDL_vulkan.h" />
     <ClInclude Include="dependencies\include\SDL2_image\SDL_image.h" />
     <ClInclude Include="dependencies\include\SDL2_ttf\SDL_ttf.h" />
+    <ClInclude Include="Utility\TextureStore.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

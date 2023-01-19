@@ -14,24 +14,26 @@ struct Tile
 };
 
 
-SDL_Point isoToScreenCoords(int x, int y, int tileWidth, int tileHeight)
+SDL_Point isoToScreenCoords(int x, int y, int tileWidth, int tileHeight, int originX, int originY)
 {
   return SDL_Point
   {
-    (x - y) * (tileWidth / 2), // screen x
-    (x + y) * (tileHeight / 2) // screen y
+    (x - y) * (tileWidth / 2) + originX, // screen x
+    (x + y) * (tileHeight / 2) + originY // screen y
   };
 }
 
-// Need to verify -- rounds down the floating point calculations as these are in pixel units
 SDL_Point screenToIsoCoords(int x, int y, int tileWidth, int tileHeight, int originX, int originY)
 {
   return SDL_Point
   {
+    // the formula I derived from the iso to screen coords formula using system of equations algebra
     (int)(((float)1 / tileWidth) * (x - originX) + ((float)1 / tileHeight) * (y - originY)),
     (int)(((float)1 / tileHeight) * (y - originY) - ((float)1 / tileWidth) * (x - originX))
   };
 }
+
+// offset origin 480, 0
 
 int main(int argc, char* argv[])
 {
@@ -65,6 +67,7 @@ int main(int argc, char* argv[])
   // 3 tiles in sprite-sheet
   int tileWidth = (srcWidth / 3);
   int tileHeight = srcHeight;
+  printf("tile width: %d\n", tileWidth);
   const SDL_Rect tile2Bounds{ 64, 0, tileWidth, tileHeight };
   const SDL_Rect tile2Offset{ 0, 0, tileWidth * SCALE, tileHeight * SCALE };
 
@@ -93,9 +96,7 @@ int main(int argc, char* argv[])
     tile.layer = layer;
     for (int y = 0; y < GRID_SIZE; ++y) {
       for (int x = 0; x < GRID_SIZE; ++x) {
-        SDL_Point screenPosition = isoToScreenCoords(x, y, tileWidth * SCALE, tileHeight * SCALE);
-        screenPosition.x += offsetOrigin.x;
-        screenPosition.y += offsetOrigin.y;
+        SDL_Point screenPosition = isoToScreenCoords(x, y, tileWidth * SCALE, tileHeight * SCALE, offsetOrigin.x, offsetOrigin.y);
         tile.rect = SDL_Rect{ screenPosition.x, screenPosition.y, tileWidth * SCALE, tileHeight * SCALE };
         screenTiles[GRID_SIZE * GRID_SIZE * layer + GRID_SIZE * y + x] = tile;
       }
@@ -128,12 +129,16 @@ int main(int argc, char* argv[])
         mouseX = event.motion.x;
         mouseY = event.motion.y;
         mouseIsoPos = screenToIsoCoords(mouseX, mouseY, tileWidth * SCALE, tileHeight * SCALE, offsetOrigin.x, offsetOrigin.y);
-
+      }
+      else if (event.type == SDL_MOUSEBUTTONDOWN)
+      {
+        mouseX = event.motion.x;
+        mouseY = event.motion.y;
+        mouseIsoPos = screenToIsoCoords(mouseX, mouseY, tileWidth * SCALE, tileHeight * SCALE, offsetOrigin.x, offsetOrigin.y);
+        printf("screen mouse pos: %d, %d\n", mouseX, mouseY);
+        printf("mouse iso pos: %d,  %d\n", mouseIsoPos.x, mouseIsoPos.y);
       }
     }
-
-    // white background
-    SDL_SetRenderDrawColor(core.getRenderer(), 255, 255, 255, 255);
 
     // ISO TILES
     for (int i = 0; i < MAX_LAYERS * GRID_SIZE * GRID_SIZE; ++i) 
@@ -145,6 +150,7 @@ int main(int argc, char* argv[])
         break;
       }
       SDL_RenderCopy(core.getRenderer(), tileTextures, &spriteTileBounds[layer], &screenTiles[i].rect);
+      //SDL_RenderDrawRect(core.getRenderer(), &screenTiles[i].rect);
     }
 
     // draw tiles backwards? then the tiles get drawn in a pyramid like structure
@@ -154,15 +160,35 @@ int main(int argc, char* argv[])
     //  SDL_RenderCopy(core.getRenderer(), tileTextures, &tile1Bounds, &tileScreenRects[i]);
     //}
 
+    // check if mouse is on highlighting neighboring adjacent isometric tiles
+    SDL_Point screenPos = isoToScreenCoords(mouseIsoPos.x, mouseIsoPos.y, tileWidth * SCALE, tileHeight * SCALE, offsetOrigin.x, offsetOrigin.y);
+    // obtain the 3 corners of the isometric image in pixels in terms of screen x and screen y
+    SDL_Point topMidCorner{ screenPos.x + (tileWidth * SCALE) / 2, screenPos.y};
+    SDL_Point rightCorner{ screenPos.x + tileWidth * SCALE, screenPos.y + (tileHeight * SCALE) / 2 };
+    SDL_Point leftCorner{ screenPos.x, screenPos.y + (tileHeight * SCALE) / 2 };
+
+    
+    SDL_Point isoTargetTile{ mouseIsoPos.x, mouseIsoPos.y };
+    // top left corner - select back tile
+    if (mouseX < topMidCorner.x && mouseY < leftCorner.y)
+    {
+      isoTargetTile = SDL_Point{ mouseIsoPos.x - 1 < 0 ? 0 : mouseIsoPos.x - 1, mouseIsoPos.y };
+      //printf("top left: %d, %d\n", isoTargetTile.x, isoTargetTile.y);
+    }
+    // bottom left corner - select front tile
+    else if (mouseX < topMidCorner.x && mouseY >= leftCorner.y)
+    {
+      isoTargetTile = SDL_Point{ mouseIsoPos.x, mouseIsoPos.y + 1 >= GRID_SIZE ? mouseIsoPos.y : mouseIsoPos.y + 1 };
+      //printf("bottom left: %d, %d\n", isoTargetTile.x, isoTargetTile.y);
+    }
+
     // render tile highlighter as long as it is within grid bounds
-    if (mouseIsoPos.x >= 0 && mouseIsoPos.x < GRID_SIZE && mouseIsoPos.y >= 0 && mouseIsoPos.y < GRID_SIZE)
+    if (isoTargetTile.x >= 0 && isoTargetTile.x < GRID_SIZE && isoTargetTile.y >= 0 && isoTargetTile.y < GRID_SIZE)
     {
       SDL_Rect* tileHighlighter = &spriteTileBounds[2];
-      SDL_Point screenPos = isoToScreenCoords(mouseIsoPos.x, mouseIsoPos.y, tileWidth * SCALE, tileHeight * SCALE);
-      screenPos.x += offsetOrigin.x;
-      screenPos.y += offsetOrigin.y;
+      SDL_Point screenTilePos = isoToScreenCoords(isoTargetTile.x, isoTargetTile.y, tileWidth * SCALE, tileHeight * SCALE, offsetOrigin.x, offsetOrigin.y);
 
-      SDL_Rect highlightRect = SDL_Rect{ screenPos.x, screenPos.y, tileWidth * SCALE, tileHeight * SCALE };
+      SDL_Rect highlightRect = SDL_Rect{ screenTilePos.x, screenTilePos.y, tileWidth * SCALE, tileHeight * SCALE };
       SDL_RenderCopy(core.getRenderer(), tileTextures, tileHighlighter, &highlightRect);
     }
 
@@ -173,7 +199,12 @@ int main(int argc, char* argv[])
       fprintf(stderr, "render error: %s\n", SDL_GetError());
     }
 
+    //SDL_Rect debugRect{ screenPos.x, screenPos.y, tileWidth * SCALE, tileHeight * SCALE };
+    //SDL_RenderDrawRect(core.getRenderer(), &debugRect);
+
     SDL_RenderPresent(core.getRenderer());
+    // white background
+    SDL_SetRenderDrawColor(core.getRenderer(), 255, 255, 255, 255);
     SDL_RenderClear(core.getRenderer());
 
 
